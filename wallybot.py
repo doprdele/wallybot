@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pypy
 # get shipping address
 # https://www.walmart.com/api/checkout-customer/:CID/shipping-address
 # get card info
@@ -86,6 +86,11 @@ def walmart_get_credit_card_fields(r):
     else:
         logger.critical('CC info not set in your account. Exiting.')
         sys.exit(0)
+
+    expiryYear,expiryMonth = (resp[0]['cardExpiryDate'].split('-'))[0:2]
+    resp[0]['expiryYear'] = expiryYear
+    resp[0]['expiryMonth'] = expiryMonth
+
     return resp[0]
 
 def walmart_atc(r,offerid):
@@ -100,7 +105,7 @@ def walmart_atc(r,offerid):
         if 'statusCode' in resp and resp['statusCode'] == 400:
             logger.critical('Product {0} not cartable. Retrying.'
                     .format(offerid))
-            time.sleep(0.3)
+            time.sleep(0.2)
             continue
         else:
             logger.info('Product {0} carted!'.format(offerid))
@@ -167,7 +172,6 @@ have more than one product in it. Clear it and retry.')
 
 
     logger.info('Setting payment')
-    expiryYear,expiryMonth = (CC_INFO['cardExpiryDate'].split('-'))[0:2]
     resp = \
     json.loads(r.post('https://www.walmart.com/api/checkout/v2/contract/:PCID/payment',
             json={
@@ -184,8 +188,8 @@ have more than one product in it. Clear it and retry.')
                         'city': CC_INFO['city'],
                         'state': CC_INFO['state'],
                         'postalCode': CC_INFO['postalCode'],
-                        'expiryMonth': expiryMonth,
-                        'expiryYear': expiryYear,
+                        'expiryMonth': CC_INFO['expiryMonth'],
+                        'expiryYear': CC_INFO['expiryYear'],
                         'phone': CC_INFO['phone']
                     }
                 ]}).text)

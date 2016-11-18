@@ -248,6 +248,13 @@ if __name__ == "__main__":
     parser.add_argument('password', help="Your walmart password")
     parser.add_argument('offerid', help="product id")
     parser.add_argument('cvv', help="credit card cvv")
-    args = parser.parse_args()
-    runwally(args.username,args.password,args.cvv,args.offerid)
+    parser.add_argument("-d", "--debug", help="Debug output.")
 
+    args = parser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+
+    runwally(args.username, args.password, args.cvv, args.offerid)

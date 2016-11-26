@@ -9,6 +9,7 @@ import sys
 import time
 import logging
 import argparse
+import threading
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
@@ -235,12 +236,19 @@ def runwally(username, password, cvv, offerid):
             sys.exit(1)
 
         walmart_register(r, username)
+
+        registration_refresh_timer = threading.Timer(45.0,
+                walmart_register, [r, username])
+        registration_refresh_timer.start()
+
         SHIPPING_INFO = walmart_get_shipping_address(r)
         CC_INFO = walmart_get_credit_card_fields(r)
 
         walmart_atc(r, offerid)
 
         walmart_checkout(r, SHIPPING_INFO, CC_INFO, cvv)
+
+        registration_refresh_timer.cancel()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -110,8 +110,22 @@ def walmart_atc(r,offerid):
                     .format(offerid))
             time.sleep(0.2)
             continue
+        elif 'statusCode' in resp and resp['statusCode'] == 502:
+            logger.critical('Unable to cart {0}. Bad gateway. Retrying. Error code: {1}'.format(
+                offerid, json.dumps(resp,indent=4,sort_keys=True)))
+            time.sleep(0.02)
+            continue
+        elif 'statusCode' in resp and resp['statusCode'] == 500:
+            logger.critical('Unable to cart {0}. Internal error. Retrying. Error code: {1}'.format(
+                offerid, json.dumps(resp,indent=4,sort_keys=True)))
+            time.sleep(0.02)
+            continue
         else:
-            logger.info('Product {0} carted!'.format(offerid))
+            logger.info('Product {0} carted! Response: {1}'.format(
+                offerid,
+                json.dumps(resp,
+                    indent=4,
+                    sort_keys=True)))
             logger.debug('Cookies after carting {0}'.format(r.cookies))
             break
 

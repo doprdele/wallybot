@@ -9,7 +9,7 @@ import sys
 import time
 import logging
 import argparse
-import threading
+from apscheduler.schedulers.background import BackgroundScheduler
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
@@ -96,6 +96,7 @@ def walmart_get_credit_card_fields(r):
 
 def walmart_atc(r,offerid):
     while True:
+        __cookies__ = r.cookies
         resp = json.loads(r.post('https://api.mobile.walmart.com/cart/items',
                 json = {
                     'quantity': 1,
@@ -103,6 +104,7 @@ def walmart_atc(r,offerid):
                     }).text)
         logger.debug('ATC response: {0}'.format(
             json.dumps(resp, indent=4, sort_keys=True)))
+        logger.debug('Current cookies: {0}'.format(__cookies__))
         if 'statusCode' in resp and resp['statusCode'] == 400:
             logger.critical('Product {0} not cartable. Retrying.'
                     .format(offerid))
@@ -110,6 +112,7 @@ def walmart_atc(r,offerid):
             continue
         else:
             logger.info('Product {0} carted!'.format(offerid))
+            logger.debug('Cookies after carting {0}'.format(r.cookies))
             break
 
 def walmart_checkout(r, SHIPPING_INFO, CC_INFO, CVV):
@@ -137,6 +140,8 @@ def walmart_checkout(r, SHIPPING_INFO, CC_INFO, CVV):
         logger.critical('\
 Could not find item_id in cart. Your cart may be empty or your cart \
 have more than one product in it. Clear it and retry.')
+        logger.critical('Contract response: {0}'.format(
+            json.dumps(resp, indent=4,sort_keys=True)))
         sys.exit(1)
 
     logger.info('Found cart item id {0}'.format(item_id))
@@ -237,9 +242,11 @@ def runwally(username, password, cvv, offerid):
 
         walmart_register(r, username)
 
-        registration_refresh_timer = threading.Timer(45.0,
-                walmart_register, [r, username])
-        registration_refresh_timer.start()
+        walmart_scheduler = BackgroundScheduler()
+        walmart_scheduler.add_job(walmart_register, 'interval',
+                args=[r,username],
+                seconds=10.0,id='walmart_register')
+        walmart_scheduler.start()
 
         SHIPPING_INFO = walmart_get_shipping_address(r)
         CC_INFO = walmart_get_credit_card_fields(r)
@@ -248,7 +255,8 @@ def runwally(username, password, cvv, offerid):
 
         walmart_checkout(r, SHIPPING_INFO, CC_INFO, cvv)
 
-        registration_refresh_timer.cancel()
+        walmart_scheduler.shutdown()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

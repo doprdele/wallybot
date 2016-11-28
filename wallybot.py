@@ -28,6 +28,28 @@ def walmart_pre_signin(r):
     r.get('https://api.mobile.walmart.com/mauth/v2/shippingPassEligible')
     return
 
+def walmart_get_offerid(r, productid):
+    logger.debug('Running walmart_get_offerid({0})'.format(productid))
+
+    while True:
+        resp = \
+                json.loads(r.get('http://www.walmart.com/product/mobile/api/{0}?location=01906'.format(productid)).text)
+        logger.debug('Walmart get_offerid response: {0}'.format(
+          json.dumps(resp,indent=4,sort_keys=True)))
+
+        try:
+            _offerid = filter(lambda p: p['seller']['name'] == 'Walmart.com',
+                    resp['product']['buyingOptions']['marketplaceOptions'])
+            offerid = _offerid[0]['offerId']
+            logger.info('OfferId discovered: {0}'.format(offerid))
+            return offerid
+        except Exception as e:
+            logger.info('No WalMart offerid discovered, continuing...')
+            time.sleep(0.2)
+            continue
+
+
+
 def walmart_signin(r, username, password):
     logger.debug('Signing with username={0}, password={1}'.format(username, password))
     resp = json.loads(r.post('https://api.mobile.walmart.com/v4/mauth/get-token',
@@ -235,7 +257,7 @@ have more than one product in it. Clear it and retry.')
             time.sleep(0.1)
             continue
 
-def runwally(username, password, cvv, offerid):
+def runwally(username, password, cvv, offerid,productid):
     with requests.Session() as r:
 
         retries = Retry(total=9999,
@@ -265,7 +287,10 @@ def runwally(username, password, cvv, offerid):
         SHIPPING_INFO = walmart_get_shipping_address(r)
         CC_INFO = walmart_get_credit_card_fields(r)
 
-        walmart_atc(r, offerid)
+        if (offerid):
+            walmart_atc(r, offerid)
+        else:
+            walmart_atc(r, walmart_get_offerid(r, productid))
 
         walmart_checkout(r, SHIPPING_INFO, CC_INFO, cvv)
 
@@ -276,7 +301,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('username', help="Your walmart username (email)")
     parser.add_argument('password', help="Your walmart password")
-    parser.add_argument('offerid', help="product id")
+    id_parser = parser.add_mutually_exclusive_group(required=True)
+    id_parser.add_argument('-offerid', help="offer id",default=None)
+    id_parser.add_argument('-productid', help="product id",default=None)
     parser.add_argument('cvv', help="credit card cvv")
     parser.add_argument("-d", "--debug", help="Debug output.")
 
@@ -287,4 +314,5 @@ if __name__ == "__main__":
     else:
         logger.setLevel(logging.INFO)
 
-    runwally(args.username, args.password, args.cvv, args.offerid)
+    runwally(args.username, args.password, args.cvv, args.offerid,
+            args.productid)
